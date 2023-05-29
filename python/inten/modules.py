@@ -118,6 +118,56 @@ class DeConv(nn.Module):
         return self.net(x)
 
 
+class SqueezePartRaw(nn.Module):
+    SQ_ADD = 16
+    EF_ADD = 64
+
+    def __init__(self, input_channels, sq, ef, depth, cam_depth=0, top_parent=None):
+        super().__init__()
+        efs = []
+        sqs = []
+        input_channelss = []
+        cam = cam_depth > 0
+        self.depth = depth
+        self.down = []
+        # self.net.append()
+        self.pool = Pool(3, 2, 1, top_parent=top_parent)
+        self.up = []
+        for i in range(depth):
+            self.down.append(nn.Sequential(Fire(input_channels, sq, ef, cam, top_parent=top_parent),
+                                           Fire(2 * ef, sq, ef, cam, top_parent=top_parent)))
+            sqs.append(sq)
+            efs.append(ef)
+            input_channelss.append(input_channels)
+            input_channels = ef * 2
+            ef += self.EF_AD
+            sq += self.SQ_ADD
+        self.down.append(nn.Sequential(
+            Fire(input_channels, sq, ef, cam, top_parent=top_parent),
+            Fire(2 * ef, sq, ef, cam, top_parent=top_parent),
+            Fire(2 * ef, sq + self.SQ_ADD, ef + self.EF_ADD, cam, top_parent=top_parent),
+            Fire(2 * (ef + self.EF_ADD), sq + self.SQ_ADD, ef + self.EF_ADD, cam, top_parent=top_parent),
+        ))
+        for i in range(depth):
+            sq = sqs.pop()
+            ef = efs.pop()
+            self.up.append(
+                DeFire(2 * (ef + self.EF_ADD * (2 if i == depth - 1 else 1)), 2 * sq, ef, top_parent=top_parent))
+
+    def forward(self, x):
+        res = []
+        for i in range(self.depth):
+            x = self.down[i](x)
+            res.append(x)
+            x = self.pool(x)
+        x = self.down[self.depth](x)
+        feat = torch.clone(x)
+        for i in range(self.depth):
+            x = self.up[self.depth - i - 1](x)
+            x += self.res[self.depth - i - 1](x)
+        return feat, x
+
+
 class SqueezePart(nn.Module):
     SQ_ADD = 16
     EF_ADD = 64
@@ -133,10 +183,12 @@ class SqueezePart(nn.Module):
                 Fire(2 * (ef + self.EF_ADD), sq + self.SQ_ADD, ef + self.EF_ADD, cam, top_parent=top_parent),
             )
         else:
-            self.beg = nn.Sequential(Fire(input_channels, sq, ef, cam, top_parent=top_parent), Fire(2 * ef, sq, ef, cam, top_parent=top_parent))
+            self.beg = nn.Sequential(Fire(input_channels, sq, ef, cam, top_parent=top_parent),
+                                     Fire(2 * ef, sq, ef, cam, top_parent=top_parent))
             self.rest = nn.Sequential(
                 Pool(3, 2, 1, top_parent=top_parent),
-                SqueezePart(2 * ef, sq + self.SQ_ADD, ef + self.EF_ADD, depth - 1, cam_depth - 1, top_parent=top_parent),
+                SqueezePart(2 * ef, sq + self.SQ_ADD, ef + self.EF_ADD, depth - 1, cam_depth - 1,
+                            top_parent=top_parent),
                 DeFire(2 * (ef + self.EF_ADD * (2 if depth == 1 else 1)), 2 * sq, ef, top_parent=top_parent),
             )
         self.depth = depth
@@ -152,7 +204,8 @@ class SqueezePart(nn.Module):
 
 class XYZ(nn.Module):
     vert_angles = np.radians(
-        np.concatenate((np.linspace(4 + (1.0 / 3), (-8 - 1.0 / 3), 40), np.linspace((-8 - 1.0 / 3 - 1.0 / 2), (-24 - 1.0 / 3), 32)))
+        np.concatenate((np.linspace(4 + (1.0 / 3), (-8 - 1.0 / 3), 40),
+                        np.linspace((-8 - 1.0 / 3 - 1.0 / 2), (-24 - 1.0 / 3), 32)))
     )
     hor_angles = np.radians(np.flip(np.arange(0, 360, 0.1728)) + 180)
     ray = np.array([1.0, 0, 0])
@@ -164,10 +217,12 @@ class XYZ(nn.Module):
         self.ray = torch.from_numpy(self.ray)
         self.x_start = x_start
         self.vert_rotmat = torch.from_numpy(
-            np.array([[[np.cos(angle), 0, -np.sin(angle)], [0, 1, 0], [np.sin(angle), 0, np.cos(angle)]] for angle in self.vert_angles])
+            np.array([[[np.cos(angle), 0, -np.sin(angle)], [0, 1, 0], [np.sin(angle), 0, np.cos(angle)]] for angle in
+                      self.vert_angles])
         )
         self.hor_rotmat = torch.from_numpy(
-            np.array([[[np.cos(angle), -np.sin(angle), 0], [np.sin(angle), np.cos(angle), 0], [0, 0, 1]] for angle in self.hor_angles])
+            np.array([[[np.cos(angle), -np.sin(angle), 0], [np.sin(angle), np.cos(angle), 0], [0, 0, 1]] for angle in
+                      self.hor_angles])
         )
 
     def forward(self, data):
@@ -187,18 +242,18 @@ class CRF(nn.Module):
     SQ_VAR_ANG = np.array([0.9, 0.9, 0.6, 0.6]) ** 2
 
     def __init__(
-        self,
-        num_iterations,
-        bf_start_dim,
-        bf_dims,
-        mask_dim=-1,
-        size_a=3,
-        size_b=5,
-        sq_var_bi=None,
-        sq_var_ang=None,
-        sq_var_bi_ang=None,
-        ang_coef=0.02,
-        bi_coef=0.1,
+            self,
+            num_iterations,
+            bf_start_dim,
+            bf_dims,
+            mask_dim=-1,
+            size_a=3,
+            size_b=5,
+            sq_var_bi=None,
+            sq_var_ang=None,
+            sq_var_bi_ang=None,
+            ang_coef=0.02,
+            bi_coef=0.1,
     ):
         super().__init__()
         if sq_var_ang is None:
@@ -219,7 +274,7 @@ class CRF(nn.Module):
         self.bi_ang_compat.weight = nn.Parameter(torch.from_numpy(init * bi_coef))
 
     def forward(self, lidar_input, data):
-        bf_weights = self.bilateral(lidar_input[:, self.bf_start_dim : self.bf_start_dim + self.bf_dims])
+        bf_weights = self.bilateral(lidar_input[:, self.bf_start_dim: self.bf_start_dim + self.bf_dims])
         mask = (lidar_input[:, self.mask_dim, None, ...] >= 0.5).float()
         for _ in range(self.iterations):
             unary = F.softmax(data, 1)
@@ -263,14 +318,14 @@ class RGB2GS(nn.Module):
         self.as_tuple = as_tuple
 
     def forward(self, data):
-        rgb = data[:, self.dim_start : self.dim_start + 3]
+        rgb = data[:, self.dim_start: self.dim_start + 3]
         rgb = rgb ** self._GAMMA
         gs = self.conv(rgb)
         mask = gs > self._THRESH_CU
         gs[mask] = gs[mask] ** self._EXP
         gs[~mask] = gs[~mask] / self._THRESH_SQ_THR + self._ADD
         gs = (self._MULT * gs - self._MINUS) / self._NORM
-        data = torch.cat((data[:, : self.dim_start], gs, data[:, self.dim_start + 3 :]), 1)
+        data = torch.cat((data[:, : self.dim_start], gs, data[:, self.dim_start + 3:]), 1)
         if self.as_tuple:
             return (data,)
         return data
@@ -284,11 +339,15 @@ class _LocalPassing(nn.Module):
         super().__init__()
         self.ang_conv = nn.Conv2d(in_channels, in_channels, (size_a, size_b), padding=pad, bias=False)
         self.bi_ang_conv = nn.Conv2d(in_channels, in_channels, (size_a, size_b), padding=pad, bias=False)
-        self.condense_conv = nn.Conv2d(in_channels, (size_a * size_b - 1) * in_channels, (size_a, size_b), padding=pad, bias=False)
+        self.condense_conv = nn.Conv2d(in_channels, (size_a * size_b - 1) * in_channels, (size_a, size_b), padding=pad,
+                                       bias=False)
 
-        self.ang_conv.weight = nn.Parameter(torch.from_numpy(_gauss_weights(size_a, size_b, in_channels, sq_var_ang)), requires_grad=False)
-        self.bi_ang_conv.weight = nn.Parameter(torch.from_numpy(_gauss_weights(size_a, size_b, in_channels, sq_var_bi)), requires_grad=False)
-        self.condense_conv.weight = nn.Parameter(torch.from_numpy(_condensing_weights(size_a, size_b, in_channels)), requires_grad=False)
+        self.ang_conv.weight = nn.Parameter(torch.from_numpy(_gauss_weights(size_a, size_b, in_channels, sq_var_ang)),
+                                            requires_grad=False)
+        self.bi_ang_conv.weight = nn.Parameter(torch.from_numpy(_gauss_weights(size_a, size_b, in_channels, sq_var_bi)),
+                                               requires_grad=False)
+        self.condense_conv.weight = nn.Parameter(torch.from_numpy(_condensing_weights(size_a, size_b, in_channels)),
+                                                 requires_grad=False)
 
     def forward(self, data, mask, bilateral):
         b, c, h, w = data.shape
@@ -305,13 +364,17 @@ class _BilateralWeights(nn.Module):
         pad = (size_a // 2, size_b // 2)
         self.in_channels = in_channels
         self.sq_var = sq_var
-        self.condense_conv = nn.Conv2d(in_channels, (size_a * size_b - 1) * in_channels, (size_a, size_b), padding=pad, bias=False)
-        self.condense_conv.weight = nn.Parameter(torch.from_numpy(_condensing_weights(size_a, size_b, in_channels)), requires_grad=False)
+        self.condense_conv = nn.Conv2d(in_channels, (size_a * size_b - 1) * in_channels, (size_a, size_b), padding=pad,
+                                       bias=False)
+        self.condense_conv.weight = nn.Parameter(torch.from_numpy(_condensing_weights(size_a, size_b, in_channels)),
+                                                 requires_grad=False)
 
     def forward(self, data):
         condensed = self.condense_conv(data)
-        diffs = [data[:, i, None, ...] - condensed[:, i :: self.in_channels, ...] for i in range(self.in_channels)]
-        return torch.stack([torch.exp_(-sum([diff ** 2 for diff in diffs]) / (2 * self.sq_var[i])) for i in range(len(self.sq_var))], 1)
+        diffs = [data[:, i, None, ...] - condensed[:, i:: self.in_channels, ...] for i in range(self.in_channels)]
+        return torch.stack(
+            [torch.exp_(-sum([diff ** 2 for diff in diffs]) / (2 * self.sq_var[i])) for i in range(len(self.sq_var))],
+            1)
 
 
 def _gauss_weights(size_a, size_b, num_classes, sq_var):
@@ -334,5 +397,6 @@ def _condensing_weights(size_a, size_b, in_channels):
         for j in range(size_b):
             for k in range(in_channels):
                 kernel[i * (size_b * in_channels) + j * in_channels + k, k, i, j] = 1
-    kernel = np.concatenate([kernel[: in_channels * half_filter_dim], kernel[in_channels * (half_filter_dim + 1) :]], axis=0)
+    kernel = np.concatenate([kernel[: in_channels * half_filter_dim], kernel[in_channels * (half_filter_dim + 1):]],
+                            axis=0)
     return kernel

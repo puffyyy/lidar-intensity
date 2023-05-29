@@ -13,7 +13,8 @@ class TransformHead(nn.Module):
         self.dim = dim
         self.start_dim = start_dim
         self.ndim = dim + (1 if self.affine else 0)
-        self.net = nn.Sequential(nn.AdaptiveAvgPool1d(mid_size), nn.ReLU(inplace=True), nn.Linear(mid_size, dim * self.ndim))
+        self.net = nn.Sequential(nn.AdaptiveAvgPool1d(mid_size), nn.ReLU(inplace=True),
+                                 nn.Linear(mid_size, dim * self.ndim))
         self.net[-1].weight.data.zero_()
         self.net[-1].bias.data.copy_(torch.eye(self.dim, self.ndim).view(-1))
 
@@ -24,10 +25,11 @@ class TransformHead(nn.Module):
             grid = F.affine_grid(trans, data_input.size())
             result = F.grid_sample(data_input, grid, mode='nearest')
         else:
-            data_in = data_input[:, self.start_dim : self.start_dim + self.dim, ...]
+            data_in = data_input[:, self.start_dim: self.start_dim + self.dim, ...]
             if self.affine:
                 data_in = torch.cat(
-                    (data_in, torch.ones(data_input.shape[0], 1, *data_input.shape[2:], device=data_input.device, dtype=data_input.dtype)), 1
+                    (data_in, torch.ones(data_input.shape[0], 1, *data_input.shape[2:], device=data_input.device,
+                                         dtype=data_input.dtype)), 1
                 )
             old_shape = data_in.shape
             data_in = data_in.view((*old_shape[:2], -1))
@@ -35,7 +37,8 @@ class TransformHead(nn.Module):
             if self.affine:
                 result = result[:, :-1, ...] / result[:, -1, ...]
             result = result.view((old_shape[0], self.dim, *old_shape[2:]))
-            result = torch.cat((data_input[:, : self.start_dim, ...], result, data_input[:, self.start_dim + self.dim :, ...]), 1)
+            result = torch.cat(
+                (data_input[:, : self.start_dim, ...], result, data_input[:, self.start_dim + self.dim:, ...]), 1)
         return result
 
 
@@ -53,7 +56,7 @@ class L2ReflectHead(nn.Module):
         out = self.net(features)
         if out.shape[-1] != data_input.shape[-1]:
             diff = out.shape[-1] - data_input.shape[-1]
-            out = out[..., (diff // 2) : -(diff // 2)]
+            out = out[..., (diff // 2): -(diff // 2)]
         return (out,)
 
 
@@ -61,11 +64,15 @@ class ReflectHead(nn.Module):
     def __init__(self, in_channels, mid_channels, return_value=False):
         super().__init__()
         self.ranges = nn.Parameter(
-            torch.tensor([0.07952585, 0.08348164, 0.06294145, 0.03815826, 0.02533704, 0.02099525, 0.02404286, 0.03440835, 0.17729683, 0.45381247]),
+            torch.tensor(
+                [0.07952585, 0.08348164, 0.06294145, 0.03815826, 0.02533704, 0.02099525, 0.02404286, 0.03440835,
+                 0.17729683, 0.45381247]),
             requires_grad=False,
         )
         self.mins = nn.Parameter(
-            torch.tensor([0.0, 0.07952585, 0.16300749, 0.22594894, 0.2641072, 0.28944424, 0.31043949, 0.33448235, 0.3688907, 0.54618753]),
+            torch.tensor(
+                [0.0, 0.07952585, 0.16300749, 0.22594894, 0.2641072, 0.28944424, 0.31043949, 0.33448235, 0.3688907,
+                 0.54618753]),
             requires_grad=False,
         )
         self.up = md.DeFire(in_channels, mid_channels // 16, mid_channels // 2)
@@ -79,7 +86,7 @@ class ReflectHead(nn.Module):
         up = self.up(features)
         if up.shape[-1] != data_input.shape[-1]:
             diff = up.shape[-1] - data_input.shape[-1]
-            up = up[..., (diff // 2) : -(diff // 2)]
+            up = up[..., (diff // 2): -(diff // 2)]
         clazz = self.clazz(up)
         sq = self.sq(clazz)
         sm = self.sm(up)
@@ -105,6 +112,37 @@ class SegmentHead(nn.Module):
         result = self.net(features)
         if result.shape[-1] != data_input.shape[-1]:
             diff = result.shape[-1] - data_input.shape[-1]
-            result = result[..., (diff // 2) : -(diff // 2)]
+            result = result[..., (diff // 2): -(diff // 2)]
         result = self.crf(data_input, result)
         return result
+
+
+def autopad(k, p=None, d=1):  # kernel, padding, dilation
+    # Pad to 'same' shape outputs
+    if d > 1:
+        k = d * (k - 1) + 1 if isinstance(k, int) else [d * (x - 1) + 1 for x in k]  # actual kernel-size
+    if p is None:
+        p = k // 2 if isinstance(k, int) else [x // 2 for x in k]  # auto-pad
+    return p
+
+
+class WeatherClassifyHead(nn.Module):
+    def __init__(self,
+                 c1,
+                 c2,
+                 k=1,
+                 s=1,
+                 p=None,
+                 g=1,
+                 dropout_p=0.0):  # ch_in, ch_out, kernel, stride, padding, groups, dropout probability
+        super().__init__()
+        c_ = 1280  # efficientnet_b0 size
+        self.conv = md.Conv(c1, c_, k, s, autopad(k, p), g)
+        self.pool = nn.AdaptiveAvgPool2d(1)  # to x(b,c_,1,1)
+        self.drop = nn.Dropout(p=dropout_p, inplace=True)
+        self.linear = nn.Linear(c_, c2)  # to x(b,c2)
+
+    def forward(self, x):
+        if isinstance(x, list):
+            x = torch.cat(x, 1)
+        return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))

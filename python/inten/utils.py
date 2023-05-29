@@ -11,7 +11,7 @@ def create_optim_from_kwargs(params, name='', **kwargs):
     return optim(params, **kwargs)  # pylint: disable=not-callable
 
 
-def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=4, only_l2=False):
+def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=4, only_l2=False, weather=False):
     if reflect:
         if only_l2:
 
@@ -57,6 +57,11 @@ def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=
                 weight = (1 - pred_prob.gather(1, intensity_bin[:, None, ...])) ** gamma
                 l2_loss = F.mse_loss(pred_dist, intensity_dist, reduction='none')
                 loss = (weight * ce_loss + l2_loss * l2_weight)[rgb_mask & mask & label_mask]
+                if weather:
+                    weather_gt = kwargs['weather']
+                    pred_weather = output[2]
+                    weather_ce_loss = F.cross_entropy(pred_weather, weather_gt, reduction='none')[:, None, ...]
+                    loss += 0.05 * weather_ce_loss
                 if mean:
                     return torch.mean(loss)
                 return loss
@@ -71,8 +76,10 @@ def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=
             tweight = torch.from_numpy(weight).to(output.device)
             b, _, h, w = output.shape
             output_prob = F.softmax(output, 1)
-            output_prob = torch.cat((output_prob, torch.ones(b, 1, h, w, device=output_prob.device, dtype=output_prob.dtype)), 1)
-            result = F.cross_entropy(output, labels, reduction='none', weight=tweight, ignore_index=ignore_index)[:, None, ...]
+            output_prob = torch.cat(
+                (output_prob, torch.ones(b, 1, h, w, device=output_prob.device, dtype=output_prob.dtype)), 1)
+            result = F.cross_entropy(output, labels, reduction='none', weight=tweight, ignore_index=ignore_index)[:,
+                     None, ...]
             loss_weight = (1 - output_prob.gather(1, labels[:, None, ...])) ** gamma
             loss = (loss_weight * result)[mask]
             if mean:
@@ -116,7 +123,7 @@ def create_image_fn(reflect, ignore_index=4):
             h, w, *_ = intensity.shape
             result = np.ones((h * 3 + 2 * BORDER, w))
             result[:h] = intensity
-            result[h + BORDER : 2 * h + BORDER] = pred_value
+            result[h + BORDER: 2 * h + BORDER] = pred_value
             result[-h:] = ok_map
             return (result * 255).astype('u1'), score
 
@@ -138,7 +145,7 @@ def create_image_fn(reflect, ignore_index=4):
             h, w, c = ok_map.shape
             result = np.ones((h * 3 + 2 * BORDER, w, c), dtype='u1') * 255
             result[:h] = correct
-            result[h + BORDER : 2 * h + BORDER] = pred
+            result[h + BORDER: 2 * h + BORDER] = pred
             result[-h:] = ok_map
             return result, score
 
