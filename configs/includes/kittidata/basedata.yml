@@ -1,22 +1,22 @@
 train:
-  folder: /mnt/data/vras/Reflectance/data/TrainRef
-  name: kitti-train
+  folder: /mnt/lustre/data/waymo/cjy_test/10017090168044687777_6380_000_6400_000
+  name: 10017090168044687777_6380_000_6400_000
   ext: .npy
   shuffle: True
   keep_ram: True
 val:
-  folder: /mnt/data/vras/Reflectance/data/Validation
-  name: kitti-val
+  folder: /mnt/lustre/data/waymo/cjy_test/10017090168044687777_6380_000_6400_000
+  name: 10017090168044687777_6380_000_6400_000
   ext: .npy
   shuffle: False
   keep_ram: True
 train_loader:
-  batch_size: 24
+  batch_size: 2
   shuffle: True
   num_workers: 4
   pin_memory: True
 val_loader:
-  batch_size: 24
+  batch_size: 1
   shuffle: False
   num_workers: 4
   pin_memory: True

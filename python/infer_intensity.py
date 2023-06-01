@@ -16,7 +16,7 @@ if __name__ == "__main__":
     import otils
     import inten
     config = otils.io.load_multi_yml('../configs/eval.reflect-l2.depth.rgb.yml')
-    config['device'] = 'cpu'
+    config['device'] = 'cuda:0'
     runner = inten.data.EvalRunner(config)
 
     weights = torch.load('intensity_weights.pt')

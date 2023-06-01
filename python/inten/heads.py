@@ -137,7 +137,7 @@ class WeatherClassifyHead(nn.Module):
                  dropout_p=0.0):  # ch_in, ch_out, kernel, stride, padding, groups, dropout probability
         super().__init__()
         c_ = 1280  # efficientnet_b0 size
-        self.conv = md.Conv(c1, c_, k, s, autopad(k, p), g)
+        self.conv = md.Conv(c1, c_, k, autopad(k, p), s, g)
         self.pool = nn.AdaptiveAvgPool2d(1)  # to x(b,c_,1,1)
         self.drop = nn.Dropout(p=dropout_p, inplace=True)
         self.linear = nn.Linear(c_, c2)  # to x(b,c2)
@@ -145,4 +145,8 @@ class WeatherClassifyHead(nn.Module):
     def forward(self, x):
         if isinstance(x, list):
             x = torch.cat(x, 1)
-        return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
+        x = self.conv(x)
+        x = self.pool(x)
+        x = self.drop(x)
+        x = self.linear(x.flatten(1))
+        return x

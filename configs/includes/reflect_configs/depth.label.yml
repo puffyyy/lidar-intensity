@@ -11,5 +11,6 @@ embed:
   num_embeddings: 5
   embedding_dim: 2
   max_norm: 1
-embed_channel: labels
+embed_channels:
+  - labels
 store_dir: dl

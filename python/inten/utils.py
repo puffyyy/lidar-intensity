@@ -51,20 +51,34 @@ def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=
                     label_mask = ~(labels == ignore_index)[:, None, ...]
                 else:
                     label_mask = torch.ones_like(mask)
-                pred_bin, pred_dist, *_ = output
+                if weather:
+                    pred_ref = output[0]
+                    pred_weather = output[-1]
+                else:
+                    pred_ref = output
+                    pred_weather = None
+                pred_bin, pred_dist, *_ = pred_ref
                 pred_prob = F.softmax(pred_bin, 1)
                 ce_loss = F.cross_entropy(pred_bin, intensity_bin, reduction='none')[:, None, ...]
                 weight = (1 - pred_prob.gather(1, intensity_bin[:, None, ...])) ** gamma
                 l2_loss = F.mse_loss(pred_dist, intensity_dist, reduction='none')
-                loss = (weight * ce_loss + l2_loss * l2_weight)[rgb_mask & mask & label_mask]
+                # mm = torch.logical_and(torch.logical_and(rgb_mask,mask),label_mask)
+                # print((rgb_mask & mask & label_mask).detach().cpu().numpy())
+                relf_loss = weight * ce_loss + l2_loss * l2_weight
+                valid_mask = rgb_mask & mask & label_mask
+                loss = relf_loss[valid_mask].reshape(mask.shape)
                 if weather:
                     weather_gt = kwargs['weather']
-                    pred_weather = output[2]
+                    weather_gt = weather_gt[:, 0, 0]
                     weather_ce_loss = F.cross_entropy(pred_weather, weather_gt, reduction='none')[:, None, ...]
-                    loss += 0.05 * weather_ce_loss
-                if mean:
-                    return torch.mean(loss)
-                return loss
+                    weather_ce_loss = weather_ce_loss.unsqueeze(2).unsqueeze(3).repeat([1] + list(loss.shape)[1:])
+                    if mean:
+                        loss, weather_ce_loss = torch.mean(loss), torch.mean(weather_ce_loss)
+                    return loss, weather_ce_loss
+                else:
+                    if mean:
+                        return torch.mean(loss)
+                    return loss
 
     else:
         weight = np.array([0.132528185, 808.046146, 3.53494246, 188.286384], dtype='f4')
@@ -172,9 +186,7 @@ def info_fn(reflect, ignore_index=4, num_classes=4):
             diff = (intensity - pred_value) * (intensity - pred_value)
             diff[~mask] = 0
             return torch.tensor([diff.sum(), mask.sum()])
-
     else:
-
         def fn(batch, output):
             output = torch.argmax(output.detach(), 1, keepdim=False)
             labels = batch['labels'].detach()
@@ -199,6 +211,8 @@ def scheduler(config, optimizer):
     if sched is None:
         return None
     del config['name']
+    if 'eta_min' in config:
+        config['eta_min'] = float(config['eta_min'])
     return sched(optimizer, **config)
 
 

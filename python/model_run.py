@@ -17,8 +17,9 @@ if __name__ == '__main__':
         scheduler = inten.utils.scheduler(config['scheduler'], runner.optimizer)
     else:
         scheduler = None
-    for _ in range(config['epochs']):
+    for epoch_id in range(config['epochs']):
         trn_loss = runner(trn_dataset, tu.TorchMode.TRAIN)
         val_loss = runner(val_dataset, tu.TorchMode.EVAL)
         if scheduler is not None:
-            scheduler.step(val_loss)
+            scheduler.step()
+            print('Epoch {} current lr:'.format(epoch_id), scheduler.get_last_lr())

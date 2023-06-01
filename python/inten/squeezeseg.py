@@ -36,13 +36,15 @@ class SqueezeWithHead(nn.Module):
 class SqueezeWithMutiHead(nn.Module):
     def __init__(self, head_cls, squeeze_kwargs, head_kwargs):
         super().__init__()
-        self.squeeze = SqueezeSegBone(**squeeze_kwargs)
+        self.squeeze = SqueezeSegBoneRaw(**squeeze_kwargs)
         self.head = head_cls(**head_kwargs)
-        self.weather_head = WeatherClassifyHead(head_kwargs['conv_starts'], 4, dropout_p=0.1)
+        self.weather_head = WeatherClassifyHead(640, 4, dropout_p=0.1)
 
     def forward(self, x):
-        features = self.squeeze(x)
-        return self.head(x, features)
+        mid, feat = self.squeeze(x)
+        reflect = self.head(x, feat)
+        weather_cls = self.weather_head(mid)
+        return reflect, weather_cls
 
     @classmethod
     def load_from_kwargs(cls, data):
@@ -110,7 +112,7 @@ class SqueezeSegBoneRaw(nn.Module):
             over = self.reduce - over
             x = F.pad(x, (int(over / 2), int(over / 2), 0, 0), 'replicate')
         pre_add = self.start(x)
-        x = self.pool(x)
+        x = self.pool(pre_add)
         feat, x = self.squeeze(x)
         x = self.defire(x)
         insides = self.dropout(x)

@@ -11,7 +11,7 @@ from PIL import Image
 
 import otils as ot
 import torchutils as tu
-
+from tensorboardX import SummaryWriter
 from . import modules, squeezeseg, utils
 
 
@@ -41,11 +41,12 @@ class Dataset(tu.SimpleDataset):
     def load_and_transform(self, fname, key):
         loaded_data = np.load(fname)
         if self.limits is not None:
-            loaded_data = loaded_data[self.limits[0]['min'] : self.limits[0]['max'], self.limits[1]['min'] : self.limits[1]['max'], :]
+            loaded_data = loaded_data[self.limits[0]['min']: self.limits[0]['max'],
+                          self.limits[1]['min']: self.limits[1]['max'], :]
         result = dict()
         result['key'] = key
         for channel in self.channels:
-            tmp = loaded_data[..., channel['start'] : channel['end']]
+            tmp = loaded_data[..., channel['start']: channel['end']]
             if len(tmp.shape) != 3:
                 tmp = tmp[..., None]
             if 'scale' in channel:
@@ -69,9 +70,9 @@ class EvalRunner(tu.Runner):
         model = squeezeseg.SqueezeWithHead.load_from_kwargs(self.config['model']).to(device)
         if 'embed' in self.config:
             embed = utils.Embed(self.config['embed']).to(device)
-            embed_channel = self.config['embed_channel']
+            embed_channels = self.config['embed_channels']
         else:
-            embed, embed_channel = None, None
+            embed, embed_channels = None, []
         optimizer = None
         loss_fn = utils.create_loss_from_kwargs(**self.config['loss'])
         pass_keys = self.config['pass_keys']
@@ -96,7 +97,7 @@ class EvalRunner(tu.Runner):
             cat_channels=cat_channels,
             pass_as_kwargs=True,
             embedder=embed,
-            embed_channel=embed_channel,
+            embed_channels=embed_channels,
         )
 
     def __call__(self, dataloader, store_dir):
@@ -113,7 +114,8 @@ class EvalRunner(tu.Runner):
         for i in range(len(batch['key'])):
             result, score = self.image_fn(batch, output, i)
             os.makedirs(self.store_dir, exist_ok=True)
-            Image.fromarray(result).save(osp.join(self.store_dir, f'{score:.4f}-{osp.splitext(osp.basename(dataset.files[batch["key"][i]]))[0]}.png'))
+            Image.fromarray(result).save(osp.join(self.store_dir,
+                                                  f'{score:.4f}-{osp.splitext(osp.basename(dataset.files[batch["key"][i]]))[0]}.png'))
         info = self.info_fn(batch, output)
         if self.info_accum[(dataset, mode)] is None:
             self.info_accum[(dataset, mode)] = info
@@ -130,7 +132,7 @@ class EvalRunner(tu.Runner):
         extra_string = f'\nMean error for mode: {mode.name}:\t{error:8.4f}\n'
 
         for c in range(classes):
-            iou = acc_info[c * 3 + 1].float() / acc_info[c * 3 + 1 : (c + 1) * 3 + 1].sum()
+            iou = acc_info[c * 3 + 1].float() / acc_info[c * 3 + 1: (c + 1) * 3 + 1].sum()
             precision = acc_info[c * 3 + 1].float() / (acc_info[c * 3 + 1] + acc_info[c * 3 + 2])
             recall = acc_info[c * 3 + 1].float() / (acc_info[c * 3 + 1] + acc_info[(c + 1) * 3])
             extra_string += f'Stats for class {c}:\tIOU: {iou:8.4f}\tPrecision: {precision:8.4f}\tRecall: {recall:8.4f}\n'
@@ -142,15 +144,22 @@ class Runner(tu.Runner):
     def __init__(self, config):
         self.config = config
         device = torch.device(self.config['device'])
-        model = squeezeseg.SqueezeWithHead.load_from_kwargs(self.config['model']).to(device)
-        if 'embed' in self.config:
-            embed = utils.Embed(self.config['embed']).to(device)
-            optimizer = utils.create_optim_from_kwargs(it.chain(model.parameters(), embed.parameters()), **self.config['optim'])
-            embed_channel = self.config['embed_channel']
+        if config.get('pipeline', 'SqueezeWithHead') == 'SqueezeWithMutiHead':
+            model = squeezeseg.SqueezeWithMutiHead.load_from_kwargs(self.config['model']).to(device)
         else:
-            embed = None
+            model = squeezeseg.SqueezeWithHead.load_from_kwargs(self.config['model']).to(device)
+        if 'embed' in self.config:
+            embed_channels = self.config['embed_channels']
+            embeds = []
+            for i in embed_channels:
+                embeds.append(utils.Embed(self.config['embed']).to(device))
+            optimizer = utils.create_optim_from_kwargs(
+                it.chain(model.parameters(), *[embed.parameters() for embed in embeds]),
+                **self.config['optim'])
+        else:
+            embeds = None
             optimizer = utils.create_optim_from_kwargs(model.parameters(), **self.config['optim'])
-            embed_channel = None
+            embed_channels = []
         loss_fn = utils.create_loss_from_kwargs(**self.config['loss'])
         pass_keys = self.config['pass_keys']
         gt_keys = self.config['gt_keys']
@@ -171,15 +180,19 @@ class Runner(tu.Runner):
             accum_losses=True,
             cat_channels=cat_channels,
             pass_as_kwargs=True,
-            embedder=embed,
-            embed_channel=embed_channel,
+            embedder=embeds,
+            embed_channels=embed_channels,
         )
+        self.writer = SummaryWriter(osp.join(self.config['base_dir'], self.config['store_dir']))
 
     def run_pre_epoch(self, dataset, mode):
         self.info_accum[(dataset, mode)] = None
 
     def run_after_iter(self, batch, output, loss, mode, did, batch_id, total_batches, dataset):
-        info = self.info_fn(batch, output)
+        if self.config.get('pipeline', 'SqueezeWithHead') == 'SqueezeWithMutiHead':
+            info = self.info_fn(batch, output[0])
+        else:
+            info = self.info_fn(batch, output)
         if self.info_accum[(dataset, mode)] is None:
             self.info_accum[(dataset, mode)] = info
         else:
@@ -192,8 +205,8 @@ class Runner(tu.Runner):
                 osp.join(self.config['base_dir'], self.config['store_dir'], f'{self.run_times[dataset]:03d}'),
                 {
                     'state_dict': self.model.state_dict(),
-                    'loss_mean': np.mean([d.cpu().numpy() for d in self.run_losses[dataset]]),
-                    'embed': self.embedder.state_dict() if self.embedder is not None else None,
+                    'loss_mean': np.mean([d for d in self.run_losses[dataset]]),
+                    'embed': [emb.state_dict() for emb in self.embedder] if self.embedder is not None else None,
                     'optim': self.optimizer.state_dict(),
                 },
                 [sys.modules[__name__.split('.')[0]]],
@@ -206,7 +219,7 @@ class Runner(tu.Runner):
         extra_string = f'\nMean error for epoch {self.run_times[dataset]:03d} and mode: {mode.name}:\t{error:8.4f}\n'
 
         for c in range(classes):
-            iou = acc_info[c * 3 + 1].float() / acc_info[c * 3 + 1 : (c + 1) * 3 + 1].sum()
+            iou = acc_info[c * 3 + 1].float() / acc_info[c * 3 + 1: (c + 1) * 3 + 1].sum()
             precision = acc_info[c * 3 + 1].float() / (acc_info[c * 3 + 1] + acc_info[c * 3 + 2])
             recall = acc_info[c * 3 + 1].float() / (acc_info[c * 3 + 1] + acc_info[(c + 1) * 3])
             extra_string += f'Stats for class {c}:\tIOU: {iou:8.4f}\tPrecision: {precision:8.4f}\tRecall: {recall:8.4f}\n'
@@ -247,5 +260,5 @@ class RGB2GSRunner(EvalRunner):
             cat_channels=cat_channels,
             pass_as_kwargs=True,
             embedder=None,
-            embed_channel=None,
+            embed_channels=[],
         )

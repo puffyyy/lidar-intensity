@@ -13,13 +13,13 @@ import torch
 import torch.optim
 import torch.utils.data as data
 
+
 try:
     import tqdm
 
     _TQDM_FOUND = True
 except ImportError:
     _TQDM_FOUND = False
-
 
 builtins.print = functools.partial(print, flush=True)
 
@@ -96,20 +96,20 @@ def dict_to_cuda(d, *args, **kwargs):
 
 class Runner:
     def __init__(
-        self,
-        model,
-        loss_fn,
-        optimizer,
-        pass_keys,
-        gt_keys,
-        embedder=None,
-        embed_channel=None,
-        verbose=False,
-        args=None,
-        use_tqdm=False,
-        accum_losses=False,
-        pass_as_kwargs=False,
-        cat_channels=False,
+            self,
+            model,
+            loss_fn,
+            optimizer,
+            pass_keys,
+            gt_keys,
+            embedder=None,
+            embed_channels=None,
+            verbose=False,
+            args=None,
+            use_tqdm=False,
+            accum_losses=False,
+            pass_as_kwargs=False,
+            cat_channels=False,
     ):
         self.model = model
         self.loss_fn = loss_fn
@@ -119,7 +119,7 @@ class Runner:
         self.verbose = verbose
         self.use_tqdm = use_tqdm & _TQDM_FOUND
         self.embedder = embedder
-        self.embed_channel = embed_channel
+        self.embed_channels = embed_channels
         if args is None:
             args = argparse.Namespace(cuda=False, keep_ram=False)
         self.args = args
@@ -140,14 +140,17 @@ class Runner:
         self.run_times = collections.Counter()
         self.run_losses = dict()
         self.cat_channels = cat_channels
+        self.writer = None
 
     @contextlib.contextmanager
     def _setup(self):
         _stash = builtins.print
         if self.use_tqdm:
-            builtins.print = _compose(lambda x: tqdm.tqdm.write(x) if x.strip() else None, lambda x: '' if not self.verbose else x, str)
+            builtins.print = _compose(lambda x: tqdm.tqdm.write(x) if x.strip() else None,
+                                      lambda x: '' if not self.verbose else x, str)
         else:
-            builtins.print = _compose(lambda x: _stash(x) if x.strip() else None, lambda x: '' if not self.verbose else x, str)
+            builtins.print = _compose(lambda x: _stash(x) if x.strip() else None,
+                                      lambda x: '' if not self.verbose else x, str)
         yield
         builtins.print = _stash
 
@@ -168,7 +171,8 @@ class Runner:
                     if mode == TorchMode.TRAIN:
                         self.optimizer.zero_grad()
                     if self.embedder is not None:
-                        batch[self.embed_channel + '_embed'] = self.embedder(batch[self.embed_channel])
+                        for idx, channel in enumerate(self.embed_channels):
+                            batch[channel + '_embed'] = self.embedder[idx](batch[channel])
                     run_kwargs = collections.OrderedDict((key, batch[key]) for key in self.pass_keys)
                     if self.cat_channels:
                         output = self.model(torch.cat(tuple(run_kwargs.values()), 1))
@@ -179,7 +183,17 @@ class Runner:
                     if mode == TorchMode.TRAIN or all([key in batch for key in self.gt_keys]):
                         loss_kwargs = collections.OrderedDict((key, batch[key]) for key in self.gt_keys)
                         if self.pass_as_kwargs:
-                            loss = self.loss_fn(output, **loss_kwargs)
+                            if 'weather' in self.gt_keys:
+                                loss_refl, loss_weather = self.loss_fn(output, **loss_kwargs)
+                                loss = loss_refl * 0.95 + 0.05 * loss_weather
+                                self.writer.add_scalar('reflect_loss', loss_refl.detach().cpu().numpy(),
+                                                       self.run_times[dataloader.dataset] * batch_len + batch_id)
+                                self.writer.add_scalar('weather_loss', loss_weather.detach().cpu().numpy(),
+                                                       self.run_times[dataloader.dataset] + batch_id)
+                                self.writer.add_scalar('total_loss', loss.detach().cpu().numpy(),
+                                                       self.run_times[dataloader.dataset] + batch_id)
+                            else:
+                                loss = self.loss_fn(output, **loss_kwargs)
                         else:
                             loss = self.loss_fn(output, *loss_kwargs.values())
                         if mode == TorchMode.TRAIN:
@@ -191,9 +205,11 @@ class Runner:
                     if loss is not None:
                         print_str += f'Loss: {loss:8.04f}\t'
                     if self.accum_losses:
-                        self.run_losses[dataloader.dataset].append(loss.detach() * batch_len)
-                        print_str += f'Mean loss over epoch: {np.sum(self.run_losses[dataloader.dataset])/did: 8.04f}\t'
-                    extra = self.run_after_iter(batch, output, loss, mode, did, batch_id, len(dataloader), dataloader.dataset)
+                        self.run_losses[dataloader.dataset].append(loss.detach().cpu().numpy() * batch_len)
+                        total_loss = np.sum(self.run_losses[dataloader.dataset])
+                        print_str += f'Mean loss over epoch: {total_loss / did: 8.04f}\t'
+                    extra = self.run_after_iter(batch, output, loss, mode, did, batch_id, len(dataloader),
+                                                dataloader.dataset)
                     if extra is not None:
                         print_str += str(extra)
                     print(print_str)

@@ -1,7 +1,8 @@
+pipeline: SqueezeWithMutiHead
 model:
   head_cls: ReflectHead
   squeeze_kwargs:
-    input_channels: 8
+    input_channels: 10
     squeeze_depth: 3
     cam_depth: 1
     conv_starts: 64
@@ -17,23 +18,38 @@ gt_keys:
   - intensity_bin
   - intensity_dist
   - mask
+  - weather
 loss:
   reflect: True
   l2_weight: 1
   ignore_index: 4
+  weather: True
 info_fn:
   reflect: True
   ignore_index: 4
-base_dir: /mnt/data/vras/Reflectance/model/reflect-best/
+base_dir: /home/PJLAB/yangdonglin/workplace/lidar-intensity/runs
 pass_keys:
-  - depth
-  - labels_embed
-  - rgb
-  - rgb_mask
-  - mask
+  - depth # 1
+  - labels_embed # 2
+  - rgb # 3
+  - rgb_mask # 1
+  - weather_embed # 2
+  - mask # 1
 embed:
-  num_embeddings: 5
+  num_embeddings: 32
   embedding_dim: 2
   max_norm: 1
-embed_channel: labels
+embed_channels:
+  - labels
+  - weather
 store_dir: drgbl
+epochs:  &epochs 200
+scheduler:
+  name: CosineAnnealingLR
+  eta_min: 1e-6
+  T_max: *epochs
+
+optim:
+  name: AdamW
+  lr: 0.002
+  weight_decay: 0.005

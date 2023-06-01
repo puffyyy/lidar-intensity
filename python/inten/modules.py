@@ -129,10 +129,10 @@ class SqueezePartRaw(nn.Module):
         input_channelss = []
         cam = cam_depth > 0
         self.depth = depth
-        self.down = []
+        self.down = nn.ModuleList()
         # self.net.append()
         self.pool = Pool(3, 2, 1, top_parent=top_parent)
-        self.up = []
+        self.up = nn.ModuleList()
         for i in range(depth):
             self.down.append(nn.Sequential(Fire(input_channels, sq, ef, cam, top_parent=top_parent),
                                            Fire(2 * ef, sq, ef, cam, top_parent=top_parent)))
@@ -140,7 +140,7 @@ class SqueezePartRaw(nn.Module):
             efs.append(ef)
             input_channelss.append(input_channels)
             input_channels = ef * 2
-            ef += self.EF_AD
+            ef += self.EF_ADD
             sq += self.SQ_ADD
         self.down.append(nn.Sequential(
             Fire(input_channels, sq, ef, cam, top_parent=top_parent),
@@ -152,7 +152,7 @@ class SqueezePartRaw(nn.Module):
             sq = sqs.pop()
             ef = efs.pop()
             self.up.append(
-                DeFire(2 * (ef + self.EF_ADD * (2 if i == depth - 1 else 1)), 2 * sq, ef, top_parent=top_parent))
+                DeFire(2 * (ef + self.EF_ADD * (2 if i == 0 else 1)), 2 * sq, ef, top_parent=top_parent))
 
     def forward(self, x):
         res = []
@@ -163,8 +163,8 @@ class SqueezePartRaw(nn.Module):
         x = self.down[self.depth](x)
         feat = torch.clone(x)
         for i in range(self.depth):
-            x = self.up[self.depth - i - 1](x)
-            x += self.res[self.depth - i - 1](x)
+            x = self.up[i](x)
+            x += res[self.depth - i - 1]
         return feat, x
 
 
