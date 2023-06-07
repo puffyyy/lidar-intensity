@@ -1,12 +1,12 @@
 train:
-  folder: /mnt/lustre/data/waymo/cjy_test/10017090168044687777_6380_000_6400_000
-  name: 10017090168044687777_6380_000_6400_000
+  folder: /mnt/lustre/data/intensity/train
+  name: intensity
   ext: .npy
   shuffle: True
   keep_ram: True
 val:
-  folder: /mnt/lustre/data/waymo/cjy_test/10017090168044687777_6380_000_6400_000
-  name: 10017090168044687777_6380_000_6400_000
+  folder: /mnt/lustre/data/intensity/val
+  name: intensity_val
   ext: .npy
   shuffle: False
   keep_ram: True

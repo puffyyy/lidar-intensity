@@ -66,12 +66,12 @@ def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=
                 # print((rgb_mask & mask & label_mask).detach().cpu().numpy())
                 relf_loss = weight * ce_loss + l2_loss * l2_weight
                 valid_mask = rgb_mask & mask & label_mask
-                loss = relf_loss[valid_mask].reshape(mask.shape)
+                loss = relf_loss[valid_mask]
                 if weather:
                     weather_gt = kwargs['weather']
                     weather_gt = weather_gt[:, 0, 0]
                     weather_ce_loss = F.cross_entropy(pred_weather, weather_gt, reduction='none')[:, None, ...]
-                    weather_ce_loss = weather_ce_loss.unsqueeze(2).unsqueeze(3).repeat([1] + list(loss.shape)[1:])
+                    weather_ce_loss = weather_ce_loss.unsqueeze(2).unsqueeze(3).repeat([1] + list(mask.shape)[1:])
                     if mean:
                         loss, weather_ce_loss = torch.mean(loss), torch.mean(weather_ce_loss)
                     return loss, weather_ce_loss
