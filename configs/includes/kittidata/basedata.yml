@@ -11,7 +11,7 @@ val:
   shuffle: False
   keep_ram: True
 train_loader:
-  batch_size: 2
+  batch_size: 4
   shuffle: True
   num_workers: 4
   pin_memory: True

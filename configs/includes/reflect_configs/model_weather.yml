@@ -36,7 +36,7 @@ pass_keys:
   - weather_embed # 2
   - mask # 1
 embed:
-  num_embeddings: 32
+  num_embeddings: 16
   embedding_dim: 2
   max_norm: 1
 embed_channels:

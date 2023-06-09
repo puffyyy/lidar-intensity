@@ -134,7 +134,7 @@ class WeatherClassifyHead(nn.Module):
                  s=1,
                  p=None,
                  g=1,
-                 dropout_p=0.0):  # ch_in, ch_out, kernel, stride, padding, groups, dropout probability
+                 dropout_p=0.5):  # ch_in, ch_out, kernel, stride, padding, groups, dropout probability
         super().__init__()
         c_ = 1280  # efficientnet_b0 size
         self.conv = md.Conv(c1, c_, k, autopad(k, p), s, g)

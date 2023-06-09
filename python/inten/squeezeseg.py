@@ -38,7 +38,7 @@ class SqueezeWithMutiHead(nn.Module):
         super().__init__()
         self.squeeze = SqueezeSegBoneRaw(**squeeze_kwargs)
         self.head = head_cls(**head_kwargs)
-        self.weather_head = WeatherClassifyHead(640, 4, dropout_p=0.1)
+        self.weather_head = WeatherClassifyHead(640, 4, dropout_p=0.2)
 
     def forward(self, x):
         mid, feat = self.squeeze(x)

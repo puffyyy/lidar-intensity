@@ -13,6 +13,31 @@ import otils as ot
 import torchutils as tu
 from tensorboardX import SummaryWriter
 from . import modules, squeezeseg, utils
+Waymo2final = {
+    0: 0,
+    1: 1,
+    2: 4,
+    3: 4,
+    4: 4,
+    5: 6,
+    6: 6,
+    7: 7,
+    8: 8,
+    9: 8,
+    10: 10,
+    11: 10,
+    12: 6,
+    13: 6,
+    14: 14,
+    15: 15,
+    16: 15,
+    17: 18,
+    18: 18,
+    19: 19,
+    20: 20,
+    21: 20,
+    22: 20,
+}
 
 
 class Dataset(tu.SimpleDataset):
@@ -36,6 +61,8 @@ class Dataset(tu.SimpleDataset):
             self.limits = config['limits']
         else:
             self.limits = None
+        self.remap_lut = np.zeros((20 + 100), dtype=np.int32)
+        self.remap_lut[list(Waymo2final.keys())] = list(Waymo2final.values())
         super().__init__(folder, name=name, ext=ext, shuffle=shuffle, keep_ram=keep_ram)
 
     def load_and_transform(self, fname, key):
@@ -56,6 +83,8 @@ class Dataset(tu.SimpleDataset):
             tmp = np.transpose(tmp, (2, 0, 1))
             if 'squeeze' in channel and channel['squeeze']:
                 tmp = np.squeeze(tmp)
+            if channel['name'] == 'labels':
+                tmp = self.remap_lut[tmp]
             result[channel['name']] = tmp
         return result
 
