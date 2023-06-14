@@ -43,7 +43,7 @@ embed_channels:
   - labels
   - weather
 store_dir: drgbl
-epochs:  &epochs 200
+epochs: &epochs 200
 scheduler:
   name: CosineAnnealingLR
   eta_min: 1e-6
@@ -65,23 +65,16 @@ train:
   ext: .npy
   shuffle: True
   keep_ram: True
-  limits:
-    - min: 0
-      max: 64
-    - min: 640
-      max: 1920
+
+
 val:
   folder: /mnt/lustre/data/intensity/val
   name: intensity_val
   ext: .npy
   shuffle: False
   keep_ram: True
-  limits:
-    - min: 0
-      max: 64
-    - min: 640
-      max: 1920
-#512
+
+
 train_loader:
   batch_size: 4
   shuffle: True

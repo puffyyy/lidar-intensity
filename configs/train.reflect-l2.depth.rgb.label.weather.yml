@@ -1,6 +1,3 @@
-- includes/common.yml
-- includes/kittidata/basedata.yml
-- includes/kittidata/only_mid.yml
 - includes/kittidata/channels/depth.yml
 - includes/kittidata/channels/intensity_bin.yml
 - includes/kittidata/channels/intensity_dist.yml
