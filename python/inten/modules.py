@@ -158,7 +158,7 @@ class SqueezePartRaw(nn.Module):
         res = []
         for i in range(self.depth):
             x = self.down[i](x)
-            res.append(x)
+            res.append(torch.clone(x))
             x = self.pool(x)
         x = self.down[self.depth](x)
         feat = torch.clone(x)

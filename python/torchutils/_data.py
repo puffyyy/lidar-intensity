@@ -183,24 +183,15 @@ class Runner:
                     if mode == TorchMode.TRAIN or all([key in batch for key in self.gt_keys]):
                         loss_kwargs = collections.OrderedDict((key, batch[key]) for key in self.gt_keys)
                         if self.pass_as_kwargs:
-                            if 'weather' in self.gt_keys:
-                                loss_refl, loss_weather = self.loss_fn(output, **loss_kwargs)
-                                loss = loss_refl * 0.95 + 0.05 * loss_weather
-                                self.writer.add_scalar('reflect_loss', loss_refl.detach().cpu().numpy(),
-                                                       self.run_times[dataloader.dataset] * batch_len + batch_id)
-                                self.writer.add_scalar('weather_loss', loss_weather.detach().cpu().numpy(),
-                                                       self.run_times[dataloader.dataset] + batch_id)
-                                self.writer.add_scalar('total_loss', loss.detach().cpu().numpy(),
-                                                       self.run_times[dataloader.dataset] + batch_id)
-                            else:
-                                loss = self.loss_fn(output, **loss_kwargs)
+                            loss, loss_dict = self.loss_fn(output, **loss_kwargs)
                         else:
-                            loss = self.loss_fn(output, *loss_kwargs.values())
+                            loss, loss_dict = self.loss_fn(output, *loss_kwargs.values())
                         if mode == TorchMode.TRAIN:
                             loss.backward()
                             self.optimizer.step()
                     else:
                         loss = None
+                        loss_dict = None
                     print_str = f'Epoch id: {self.run_times[dataloader.dataset]}\t{did: 6d} / {datalen : 6d}\t'
                     if loss is not None:
                         print_str += f'Loss: {loss:8.04f}\t'
@@ -208,7 +199,7 @@ class Runner:
                         self.run_losses[dataloader.dataset].append(loss.detach().cpu().numpy() * batch_len)
                         total_loss = np.sum(self.run_losses[dataloader.dataset])
                         print_str += f'Mean loss over epoch: {total_loss / did: 8.04f}\t'
-                    extra = self.run_after_iter(batch, output, loss, mode, did, batch_id, len(dataloader),
+                    extra = self.run_after_iter(batch, output, loss_dict, mode, did, batch_id, len(dataloader),
                                                 dataloader.dataset)
                     if extra is not None:
                         print_str += str(extra)

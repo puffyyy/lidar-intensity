@@ -1,4 +1,5 @@
 import argparse
+import collections
 import glob
 import itertools as it
 import os
@@ -196,6 +197,7 @@ class Runner(tu.Runner):
         cat_channels = self.config.get('cat_channels', False)
         self.info_fn = utils.info_fn(**self.config['info_fn'])
         self.info_accum = dict()
+        self.batch_id = collections.Counter()
 
         super().__init__(
             model,
@@ -217,7 +219,7 @@ class Runner(tu.Runner):
     def run_pre_epoch(self, dataset, mode):
         self.info_accum[(dataset, mode)] = None
 
-    def run_after_iter(self, batch, output, loss, mode, did, batch_id, total_batches, dataset):
+    def run_after_iter(self, batch, output, loss_dict, mode, did, batch_id, total_batches, dataset):
         if self.config.get('pipeline', 'SqueezeWithHead') == 'SqueezeWithMutiHead':
             info = self.info_fn(batch, output[0])
         else:
@@ -226,7 +228,14 @@ class Runner(tu.Runner):
             self.info_accum[(dataset, mode)] = info
         else:
             self.info_accum[(dataset, mode)] += info
-
+        if loss_dict is not None:
+            if 'weather' in self.gt_keys:   
+                self.writer.add_scalar(mode.name+'weather_loss', loss_dict['weather_loss'].detach().cpu().numpy(),self.batch_id[mode.name])   
+            self.writer.add_scalar(mode.name+'reflect_loss', loss_dict['reflect_loss'].detach().cpu().numpy(),self.batch_id[mode.name])
+            self.writer.add_scalar(mode.name+'total_loss', loss_dict['total_loss'].detach().cpu().numpy(),self.batch_id[mode.name])
+            self.writer.add_scalar(mode.name+'reflect_ce_loss', loss_dict['reflect_ce'].detach().cpu().numpy(),self.batch_id[mode.name])
+            self.writer.add_scalar(mode.name+'reflect_l2_loss', loss_dict['reflect_l2'].detach().cpu().numpy(),self.batch_id[mode.name])
+        self.batch_id[mode.name] += 1
     def run_after_epoch(self, dataset, mode):
         if mode is tu.TorchMode.TRAIN:
             os.makedirs(osp.join(self.config['base_dir'], self.config['store_dir']), exist_ok=True)

@@ -74,11 +74,12 @@ def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=
                     weather_ce_loss = weather_ce_loss.unsqueeze(2).unsqueeze(3).repeat([1] + list(mask.shape)[1:])
                     if mean:
                         loss, weather_ce_loss = torch.mean(loss), torch.mean(weather_ce_loss)
-                    return loss, weather_ce_loss
+                    total_loss = loss * 0.95 + weather_ce_loss * 0.05
+                    return total_loss, {'total_loss':total_loss, 'reflect_loss': loss, 'weather_loss':weather_ce_loss, 'reflect_l2': l2_loss, 'reflect_ce':ce_loss}
                 else:
                     if mean:
                         return torch.mean(loss)
-                    return loss
+                    return loss, {'total_loss':total_loss, 'reflect_loss': loss, 'reflect_l2': l2_loss, 'reflect_ce':ce_loss}
 
     else:
         weight = np.array([0.132528185, 808.046146, 3.53494246, 188.286384], dtype='f4')
