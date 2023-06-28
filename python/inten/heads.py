@@ -65,14 +65,14 @@ class ReflectHead(nn.Module):
         super().__init__()
         self.ranges = nn.Parameter(
             torch.tensor(
-                [0.07952585, 0.08348164, 0.06294145, 0.03815826, 0.02533704, 0.02099525, 0.02404286, 0.03440835,
-                 0.17729683, 0.45381247]),
+                [0.01, 0.04, 0.04, 0.04, 0.04, 0.08, 0.08, 0.08,
+                 0.09, 0.5]),
             requires_grad=False,
         )
         self.mins = nn.Parameter(
             torch.tensor(
-                [0.0, 0.07952585, 0.16300749, 0.22594894, 0.2641072, 0.28944424, 0.31043949, 0.33448235, 0.3688907,
-                 0.54618753]),
+                [0.0, 0.1, 0.5, 0.9, 0.13, 0.17, 0.25, 0.33, 0.41,
+                 0.5]),
             requires_grad=False,
         )
         self.up = md.DeFire(in_channels, mid_channels // 16, mid_channels // 2)
@@ -93,6 +93,7 @@ class ReflectHead(nn.Module):
         dist = self.dist(torch.cat((sq, sm), 1))
         if self.return_value:
             pred_bin = torch.argmax(clazz, 1, keepdim=True)
+            torch.clamp_(pred_bin, 0, 9)
             value = self.mins[pred_bin] + dist * self.ranges[pred_bin]
             return clazz, dist, value
         return clazz, dist
