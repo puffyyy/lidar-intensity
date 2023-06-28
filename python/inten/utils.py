@@ -45,8 +45,8 @@ def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=
                     rgb_mask = torch.ones_like(intensity_dist)
                 if mask is None:
                     mask = torch.ones_like(intensity_dist)
-                rgb_mask = rgb_mask >= 0
-                mask = mask >= 0
+                rgb_mask = rgb_mask > 0
+                mask = mask > 0
                 if labels is not None:
                     label_mask = ~(labels == ignore_index)[:, None, ...]
                 else:
