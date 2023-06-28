@@ -67,6 +67,8 @@ def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=
                 relf_loss = weight * ce_loss + l2_loss * l2_weight
                 valid_mask = rgb_mask & mask & label_mask
                 loss = relf_loss[valid_mask]
+                l2_loss = l2_loss[valid_mask]
+                ce_loss = ce_loss[valid_mask]
                 if weather:
                     weather_gt = kwargs['weather']
                     weather_gt = weather_gt[:, 0, 0]
