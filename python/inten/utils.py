@@ -22,8 +22,8 @@ def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=
                     rgb_mask = torch.ones_like(intensity)
                 if mask is None:
                     mask = torch.ones_like(intensity)
-                rgb_mask = rgb_mask >= 0
-                mask = mask >= 0
+                rgb_mask = rgb_mask > 0
+                mask = mask > 0
                 if labels is not None:
                     label_mask = ~(labels == ignore_index)[:, None, ...]
                 else:
@@ -91,7 +91,7 @@ def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=
         def fn(output, mask=None, labels=None, mean=True, **kwargs):  # pylint: disable=unused-argument
             if mask is None:
                 mask = torch.ones_like(output)
-            mask = mask >= 0
+            mask = mask > 0
             tweight = torch.from_numpy(weight).to(output.device)
             b, _, h, w = output.shape
             output_prob = F.softmax(output, 1)
@@ -123,9 +123,9 @@ def create_image_fn(reflect, ignore_index=4):
 
         def fn(batch, output, i):
             *_, pred_value = output
-            mask = np.squeeze(renumpy(batch['mask'], i) >= 0)
+            mask = np.squeeze(renumpy(batch['mask'], i) > 0)
             try:
-                rgb_mask = np.squeeze(renumpy(batch['rgb_mask'], i) >= 0)
+                rgb_mask = np.squeeze(renumpy(batch['rgb_mask'], i) > 0)
             except KeyError:
                 rgb_mask = np.ones_like(mask)
             try:
@@ -152,7 +152,7 @@ def create_image_fn(reflect, ignore_index=4):
             output = torch.argmax(output, 1, keepdim=False)
             output = renumpy(output, i, False)
             labels = renumpy(batch['labels'], i, False)
-            mask = np.squeeze(renumpy(batch['mask'], i) >= 0) & ~(labels == ignore_index)
+            mask = np.squeeze(renumpy(batch['mask'], i) > 0) & ~(labels == ignore_index)
             pred = COLORS[output]
             pred[~mask] = NONE
             ok_map = ~(output == labels)
@@ -176,9 +176,9 @@ def info_fn(reflect, ignore_index=4, num_classes=4):
 
         def fn(batch, output):
             pred_value = output[-1].detach()
-            mask = batch['mask'].detach() >= 0
+            mask = batch['mask'].detach() > 0
             if 'rgb_mask' in batch:
-                rgb_mask = batch['rgb_mask'].detach() >= 0
+                rgb_mask = batch['rgb_mask'].detach() > 0
             else:
                 rgb_mask = torch.ones_like(mask)
             if 'labels' in batch:
@@ -195,7 +195,7 @@ def info_fn(reflect, ignore_index=4, num_classes=4):
         def fn(batch, output):
             output = torch.argmax(output.detach(), 1, keepdim=False)
             labels = batch['labels'].detach()
-            mask = torch.squeeze(batch['mask'].detach() >= 0, 1)
+            mask = torch.squeeze(batch['mask'].detach() > 0, 1)
             label_mask = ~(labels == ignore_index)
             full_mask = mask & label_mask
             acc = (~(output == labels))[full_mask]
