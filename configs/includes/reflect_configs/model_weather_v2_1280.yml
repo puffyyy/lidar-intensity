@@ -41,8 +41,8 @@ embed:
 embed_channels:
   - labels
   - weather
-store_dir: drgbl_640
-epochs:  &epochs 100
+store_dir: drgbl_1280
+epochs:  &epochs 200
 scheduler:
   name: CosineAnnealingLR
   eta_min: 1e-6
@@ -50,7 +50,7 @@ scheduler:
 
 optim:
   name: AdamW
-  lr: 0.002
+  lr: 0.005
   weight_decay: 0.005
 
 device: 0
