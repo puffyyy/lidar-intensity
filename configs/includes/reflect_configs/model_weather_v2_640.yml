@@ -21,12 +21,12 @@ gt_keys:
 loss:
   reflect: True
   l2_weight: 1
-  ignore_index: 4
+  ignore_index: 23
   weather: False
 info_fn:
   reflect: True
-  ignore_index: 4
-base_dir: /home/admin/workspace/yangdonglin/workplace/lidar-intensity/runs
+  ignore_index: 23
+base_dir: /mnt/data/ADG_1/yangdonglin/workplace/lidar-intensity/runs
 pass_keys:
   - depth # 1
   - labels_embed # 2

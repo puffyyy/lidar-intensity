@@ -15,7 +15,6 @@ if __name__ == '__main__':
     if 'seed' in config:
         tu.seed_all(config['seed'])
     runner = inten.data.Runner(config)
-    print((config['train']))
     trn_dataset = data.DataLoader(inten.data.Dataset(config['train']), **config['train_loader'])
     val_dataset = data.DataLoader(inten.data.Dataset(config['val']), **config['val_loader'])
     if 'scheduler' in config:
