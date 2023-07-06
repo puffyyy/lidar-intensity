@@ -71,7 +71,7 @@ class ReflectHead(nn.Module):
         )
         self.mins = nn.Parameter(
             torch.tensor(
-                [0.0, 0.1, 0.5, 0.9, 0.13, 0.17, 0.25, 0.33, 0.41,
+                [0.0, 0.01, 0.05, 0.09, 0.13, 0.17, 0.25, 0.33, 0.41,
                  0.5]),
             requires_grad=False,
         )
