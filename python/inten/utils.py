@@ -32,8 +32,9 @@ def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=
                 *_, pred = output
                 loss = F.mse_loss(pred, intensity, reduction='none')[full_mask]
                 if mean:
-                    return torch.mean(loss)
-                return loss
+                    loss = torch.mean(loss)
+                    return loss, {'total_loss':loss}
+                return loss, {'total_loss':loss}
 
         else:
 

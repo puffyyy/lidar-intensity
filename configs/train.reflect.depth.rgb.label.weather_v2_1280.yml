@@ -7,4 +7,4 @@
 - includes/kittidata/channels/rgb_mask.yml
 - includes/kittidata/channels/mask.yml
 - includes/kittidata/channels/weather.yml
-- includes/reflect_configs/model_l2_weather_v2_1280.yml
+- includes/reflect_configs/model_weather_v2_1280.yml

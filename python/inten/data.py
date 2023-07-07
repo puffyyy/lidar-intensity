@@ -229,12 +229,8 @@ class Runner(tu.Runner):
         else:
             self.info_accum[(dataset, mode)] += info
         if loss_dict is not None:
-            if 'weather' in self.gt_keys:   
-                self.writer.add_scalar(mode.name+'weather_loss', loss_dict['weather_loss'].detach().cpu().numpy(),self.batch_id[mode.name])   
-            self.writer.add_scalar(mode.name+'reflect_loss', loss_dict['reflect_loss'].detach().cpu().numpy(),self.batch_id[mode.name])
-            self.writer.add_scalar(mode.name+'total_loss', loss_dict['total_loss'].detach().cpu().numpy(),self.batch_id[mode.name])
-            self.writer.add_scalar(mode.name+'reflect_ce_loss', loss_dict['reflect_ce'].detach().cpu().numpy(),self.batch_id[mode.name])
-            self.writer.add_scalar(mode.name+'reflect_l2_loss', loss_dict['reflect_l2'].detach().cpu().numpy(),self.batch_id[mode.name])
+            for k, v in loss_dict.items():
+                self.writer.add_scalar(mode.name+str(k), v.detach().cpu().numpy(),self.batch_id[mode.name])
         self.batch_id[mode.name] += 1
     def run_after_epoch(self, dataset, mode):
         if mode is tu.TorchMode.TRAIN:
