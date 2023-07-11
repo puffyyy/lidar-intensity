@@ -37,7 +37,6 @@ def create_loss_from_kwargs(reflect=False, gamma=2, l2_weight=0.5, ignore_index=
                 return loss, {'total_loss':loss}
 
         else:
-
             def fn(output, mask=None, labels=None, mean=True, **kwargs):
                 intensity_bin = kwargs['intensity_bin']
                 intensity_dist = kwargs['intensity_dist']
