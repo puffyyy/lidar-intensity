@@ -114,6 +114,7 @@ class Runner:
         self.model = model
         self.loss_fn = loss_fn
         self.optimizer = optimizer
+        self.scheduler = None
         self.pass_keys = pass_keys
         self.gt_keys = gt_keys
         self.verbose = verbose

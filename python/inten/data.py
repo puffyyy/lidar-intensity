@@ -230,7 +230,9 @@ class Runner(tu.Runner):
             self.info_accum[(dataset, mode)] += info
         if loss_dict is not None:
             for k, v in loss_dict.items():
-                self.writer.add_scalar(mode.name+str(k), v.detach().cpu().numpy(),self.batch_id[mode.name])
+                self.writer.add_scalar(mode.name + str(k), v.detach().cpu().numpy(),self.batch_id[mode.name])
+        if self.scheduler is not None:
+            self.writer.add_scalar(mode.name + str(k), self.scheduler.get_last_lr(),self.batch_id[mode.name])
         self.batch_id[mode.name] += 1
     def run_after_epoch(self, dataset, mode):
         if mode is tu.TorchMode.TRAIN:

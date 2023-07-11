@@ -19,6 +19,7 @@ if __name__ == '__main__':
     val_dataset = data.DataLoader(inten.data.Dataset(config['val']), **config['val_loader'])
     if 'scheduler' in config:
         scheduler = inten.utils.scheduler(config['scheduler'], runner.optimizer)
+        runner.scheduler = scheduler
     else:
         scheduler = None
     for epoch_id in range(config['epochs']):

@@ -19,12 +19,12 @@ gt_keys:
 loss:
   reflect: True
   l2_weight: 1
-  ignore_index: 23
+  ignore_index: 32
   weather: False
   only_l2: True
 info_fn:
   reflect: True
-  ignore_index: 23
+  ignore_index: 32
 base_dir: /mnt/data/ADG_1/yangdonglin/workplace/lidar-intensity/runs
 pass_keys:
   - depth # 1
@@ -49,7 +49,7 @@ scheduler:
 
 optim:
   name: AdamW
-  lr: 0.01
+  lr: 0.005
   weight_decay: 0.005
 
 device: 0
