@@ -42,6 +42,12 @@ embed:
 embed_channels:
   - labels
 store_dir: drgbl_l2_no_weather_640
+checkpoint: /home/admin/workspace/yangdonglin/workplace/lidar-intensity/runs/drgbl_l2_no_weather_640_20230716200531/199.tar
+image_fn:
+  reflect: True
+base_save: 'eval'
+train_save: 'train'
+val_save: 'val'
 epochs:  &epochs 200
 scheduler:
   name: CosineAnnealingLR

@@ -1,3 +1,5 @@
+import glob
+import os
 import os.path as osp
 import sys
 
@@ -11,6 +13,9 @@ if __name__ == '__main__':
     config = ot.io.load_multi_yml(sys.argv[1])
     if 'seed' in config:
         tu.seed_all(config['seed'])
+    config['store_dir'] = config['checkpoint']
+    checkpoints = sorted([int(item[:-4]) for item in os.listdir(config['checkpoint']) if str(item).endswith('.tar')])
+    config['checkpoint'] = osp.join(config['checkpoint'], str(checkpoints[-1]) + '.tar')
     cp = ot.checkpoint.load_checkpoint(osp.join(config['base_dir'], config['store_dir'], config['checkpoint']), False)
     runner = inten.data.EvalRunner(config)
     trn_dataset = data.DataLoader(inten.data.Dataset(config['train']), **config['train_loader'])

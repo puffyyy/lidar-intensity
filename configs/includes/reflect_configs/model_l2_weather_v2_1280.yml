@@ -91,3 +91,9 @@ val_loader:
   num_workers: 4
   pin_memory: True
 
+checkpoint: /home/admin/workspace/yangdonglin/workplace/lidar-intensity/runs/drgbl_l2_1280_lr0.005bs24e200
+image_fn:
+  reflect: True
+base_save: 'eval'
+train_save: 'train'
+val_save: 'val'

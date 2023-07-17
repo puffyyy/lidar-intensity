@@ -99,10 +99,12 @@ class EvalRunner(tu.Runner):
         device = torch.device(self.config['device'])
         model = squeezeseg.SqueezeWithHead.load_from_kwargs(self.config['model']).to(device)
         if 'embed' in self.config:
-            embed = utils.Embed(self.config['embed']).to(device)
             embed_channels = self.config['embed_channels']
+            embeds = []
+            for i in embed_channels:
+                embeds.append(utils.Embed(self.config['embed']).to(device))
         else:
-            embed, embed_channels = None, []
+            embeds, embed_channels = None, []
         optimizer = None
         loss_fn = utils.create_loss_from_kwargs(**self.config['loss'])
         pass_keys = self.config['pass_keys']
@@ -126,7 +128,7 @@ class EvalRunner(tu.Runner):
             accum_losses=True,
             cat_channels=cat_channels,
             pass_as_kwargs=True,
-            embedder=embed,
+            embedder=embeds,
             embed_channels=embed_channels,
         )
 
@@ -137,7 +139,8 @@ class EvalRunner(tu.Runner):
 
     def load_checkpoint(self, cp):
         if self.embedder is not None and cp['embed'] is not None:
-            self.embedder.load_state_dict(cp['embed'])
+            for idx, item in enumerate(cp['embed']):
+                self.embedder[idx].load_state_dict(item)
         self.model.load_state_dict(cp['state_dict'])
 
     def run_after_iter(self, batch, output, loss, mode, did, batch_id, _, dataset):

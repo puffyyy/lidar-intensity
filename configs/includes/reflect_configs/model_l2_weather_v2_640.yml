@@ -41,7 +41,7 @@ embed_channels:
   - labels
   - weather
 store_dir: drgbl_l2_640
-epochs:  &epochs 200
+epochs:  &epochs 500
 scheduler:
   name: CosineAnnealingLR
   eta_min: 1e-6
@@ -49,7 +49,7 @@ scheduler:
 
 optim:
   name: AdamW
-  lr: 0.005
+  lr: 0.01
   weight_decay: 0.005
 
 device: 0
@@ -91,3 +91,9 @@ val_loader:
   num_workers: 4
   pin_memory: True
 
+checkpoint: /home/admin/workspace/yangdonglin/workplace/lidar-intensity/runs/drgbl_l2_640_lr0.005bs48e200/
+image_fn:
+  reflect: True
+base_save: 'eval'
+train_save: 'train'
+val_save: 'val'
