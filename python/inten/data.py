@@ -92,6 +92,122 @@ class Dataset(tu.SimpleDataset):
     def scan_files(self):
         return sorted(glob.glob(osp.join(self.folder, '*' + self.ext)))
 
+class WaymoDataset(tu.SimpleDataset):
+    def __init__(self, config):
+        folder = config['folder']
+        name = config['name']
+        ext = '.npy'
+        shuffle = False
+        if 'keep_ram' in config:
+            keep_ram = config['keep_ram']
+        else:
+            keep_ram = True
+        self.channels = config['channels']
+        if 'limits' in config:
+            self.limits = config['limits']
+        else:
+            self.limits = None
+        self.limits = None
+        self.remap_lut = np.zeros((20 + 100), dtype=np.int32)
+        self.remap_lut[list(Waymo2final.keys())] = list(Waymo2final.values())
+        if 'carla' in config:
+            self.remap_lut = None
+        super().__init__(folder, name=name, ext=ext, shuffle=shuffle, keep_ram=keep_ram)
+    
+    def load_and_transform(self, fname, key):
+        print(fname)
+        loaded_data = np.load(fname)
+        result = dict()
+        result['key'] = key
+        result['raw'] = loaded_data
+        if self.limits is not None:
+            loaded_data = loaded_data[self.limits[0]['min']: self.limits[0]['max'],
+                          self.limits[1]['min']: self.limits[1]['max'], :]
+        for channel in self.channels:
+            tmp = loaded_data[..., channel['start']: channel['end']]
+            if len(tmp.shape) != 3:
+                tmp = tmp[..., None]
+            if 'scale' in channel:
+                tmp = (tmp - channel['scale']['min']) / (channel['scale']['max'] - channel['scale']['min'])
+            if 'retype' in channel:
+                tmp = tmp.astype(channel['retype'])
+            tmp = np.transpose(tmp, (2, 0, 1))
+            if 'squeeze' in channel and channel['squeeze']:
+                tmp = np.squeeze(tmp)
+            if channel['name'] == 'labels':
+                tmp = self.remap_lut[tmp]
+            result[channel['name']] = tmp
+        return result
+
+    def scan_files(self):
+        return sorted(glob.glob(osp.join(self.folder, '*' + self.ext)))
+
+class EvalWaymoRunner(tu.Runner):
+    def __init__(self, config):
+        self.config = config
+        device = torch.device(self.config['device'])
+        model = squeezeseg.SqueezeWithHead.load_from_kwargs(self.config['model']).to(device)
+        if 'embed' in self.config:
+            embed_channels = self.config['embed_channels']
+            embeds = []
+            for i in embed_channels:
+                embeds.append(utils.Embed(self.config['embed']).to(device))
+        else:
+            embeds, embed_channels = None, []
+        optimizer = None
+        loss_fn = utils.create_loss_from_kwargs(**self.config['loss'])
+        pass_keys = self.config['pass_keys']
+        gt_keys = self.config['gt_keys']
+        keep_ram = self.config.get('keep_ram', True)
+        cat_channels = self.config.get('cat_channels', False)
+        self.image_fn = utils.create_image_fn(**self.config['image_fn'])
+        self.store_dir = None
+        self.info_fn = utils.info_fn(**self.config['info_fn'])
+        self.info_accum = dict()
+
+        super().__init__(
+            model,
+            loss_fn,
+            optimizer,
+            pass_keys,
+            gt_keys,
+            verbose=True,
+            args=argparse.Namespace(keep_ram=keep_ram, cuda=True),
+            use_tqdm=True,
+            accum_losses=True,
+            cat_channels=cat_channels,
+            pass_as_kwargs=True,
+            embedder=embeds,
+            embed_channels=embed_channels,
+        )
+    
+    def __call__(self, dataloader, store_dir):
+        self.store_dir = store_dir
+        super().__call__(dataloader, tu.TorchMode.EVAL)
+        self.store_dir = None
+
+    def load_checkpoint(self, cp):
+        if self.embedder is not None and cp['embed'] is not None:
+            for idx, item in enumerate(cp['embed']):
+                self.embedder[idx].load_state_dict(item)
+        self.model.load_state_dict(cp['state_dict'])
+
+    def run_after_iter(self, batch, output, loss, mode, did, batch_id, _, dataset):
+        # result, score = self.image_fn(batch, output, i)
+        os.makedirs(self.store_dir, exist_ok=True)
+        *_, intensity = output
+        intensity = np.squeeze(intensity.cpu().numpy())
+        intensity = np.concatenate((intensity[3][:,332-1:2:-1],intensity[1],intensity[0],intensity[2],intensity[3][:,-4:-332-1:-1]),axis=-1)
+        raw = batch['raw']
+        raw[:,:,4] = intensity
+        np.save(os.path.join(self.store_dir,f'{osp.splitext(osp.basename(dataset.files[batch["key"][0]]))[0]}.npy'),raw)
+        
+
+    def run_pre_epoch(self, dataset, mode):
+        self.info_accum[(dataset, mode)] = None
+
+    def run_after_epoch(self, dataset, mode):
+        return ''
 
 class EvalRunner(tu.Runner):
     def __init__(self, config):
