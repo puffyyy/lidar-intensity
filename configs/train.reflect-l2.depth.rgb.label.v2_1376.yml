@@ -5,4 +5,4 @@
 - includes/kittidata/channels/rgb.yml
 - includes/kittidata/channels/rgb_mask.yml
 - includes/kittidata/channels/mask.yml
-- includes/reflect_configs/model_l2_v2_640.yml
+- includes/reflect_configs/model_l2_v2_1376.yml

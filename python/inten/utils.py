@@ -133,10 +133,11 @@ def create_image_fn(reflect, ignore_index=4):
             except KeyError:
                 label_mask = np.ones_like(mask)
             mask = mask & rgb_mask & label_mask
+            mask = np.squeeze(renumpy(batch['mask'], i) > 0)
             pred_value = np.squeeze(renumpy(pred_value, i))
             intensity = np.squeeze(renumpy(batch['intensity'], i))
-            pred_value[~mask] = 0
-            intensity[~mask] = 0
+            pred_value[~mask] = -1
+            intensity[~mask] = -1
             ok_map = np.abs(pred_value - intensity)
             score = (ok_map[mask] ** 2).mean()
             h, w, *_ = intensity.shape
@@ -144,7 +145,12 @@ def create_image_fn(reflect, ignore_index=4):
             result[:h] = intensity
             result[h + BORDER: 2 * h + BORDER] = pred_value
             result[-h:] = ok_map
-            return (result * 255).astype('u1'), score
+            ok_map[~mask] = -1
+            xyz = renumpy(batch['xyz'], i) * (131 * 2) - 131
+            diff_pc = np.concatenate([xyz, ok_map[...,None]], axis=-1)
+            src_pc = np.concatenate([xyz, intensity[...,None]], axis=-1)
+            pred_pc = np.concatenate([xyz, pred_value[...,None]], axis=-1)
+            return (result * 255).astype('u1'), (src_pc, pred_pc, diff_pc), score
 
     else:
 
@@ -187,7 +193,6 @@ def info_fn(reflect, ignore_index=4, num_classes=4):
                 label_mask = torch.ones_like(mask)
             mask = mask & rgb_mask & label_mask
             intensity = batch['intensity'].detach()
-
             diff = (intensity - pred_value) * (intensity - pred_value)
             diff[~mask] = 0
             return torch.tensor([diff.sum(), mask.sum()])

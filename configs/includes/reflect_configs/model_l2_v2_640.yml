@@ -13,6 +13,8 @@ model:
 gt_keys:
   - intensity
   - mask
+  - rgb_mask
+  - labels
 loss:
   reflect: True
   l2_weight: 1
@@ -30,11 +32,6 @@ pass_keys:
   - rgb
   - rgb_mask
   - mask
-gt_keys:
-  - rgb_mask
-  - labels
-  - mask
-  - intensity
 embed:
   num_embeddings: 24
   embedding_dim: 2
@@ -42,7 +39,6 @@ embed:
 embed_channels:
   - labels
 store_dir: drgbl_l2_no_weather_640
-checkpoint: /home/admin/workspace/yangdonglin/workplace/lidar-intensity/runs/drgbl_l2_no_weather_640_20230716200531/199.tar
 image_fn:
   reflect: True
 base_save: 'eval'
@@ -56,7 +52,7 @@ scheduler:
 
 optim:
   name: AdamW
-  lr: 0.01
+  lr: 0.005
   weight_decay: 0.005
 
 device: 0
@@ -76,7 +72,7 @@ train:
     - min: 960
       max: 1600
 val:
-  folder: /mnt/data/ADG_1/caixinyu/dataset/intensity/val
+  folder: /mnt/data/ADG_1/caixinyu/dataset/intensity/val_by_weather/0
   name: intensity_val
   ext: .npy
   shuffle: False
@@ -88,7 +84,7 @@ val:
       max: 1600
 #512
 train_loader:
-  batch_size: 48
+  batch_size: 24
   shuffle: True
   num_workers: 8
   pin_memory: True
@@ -98,3 +94,9 @@ val_loader:
   num_workers: 4
   pin_memory: True
 
+checkpoint: /home/admin/workspace/yangdonglin/workplace/lidar-intensity/runs/drgbl_l2_no_weather_640_lr0.005_bs24e200
+image_fn:
+  reflect: True
+base_save: 'eval'
+train_save: 'train'
+val_save: 'val0'

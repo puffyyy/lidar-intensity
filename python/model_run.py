@@ -12,6 +12,7 @@ if __name__ == '__main__':
     config['store_dir'] = config['store_dir'] + '_' + datetime.datetime.today().strftime('%Y%m%d%H%M%S')
     os.makedirs(os.path.join(config['base_dir'], config['store_dir']), exist_ok=True)
     shutil.copy2(sys.argv[1], os.path.join(config['base_dir'], config['store_dir'], os.path.basename(sys.argv[1])))
+    print(config['base_dir'], config['store_dir'])
     if 'seed' in config:
         tu.seed_all(config['seed'])
     runner = inten.data.Runner(config)

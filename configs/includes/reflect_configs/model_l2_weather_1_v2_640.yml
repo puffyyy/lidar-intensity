@@ -69,7 +69,7 @@ train:
     - min: 960
       max: 1600
 val:
-  folder: /mnt/data/ADG_1/caixinyu/dataset/intensity/val_by_weather/0
+  folder: /mnt/data/ADG_1/caixinyu/dataset/intensity/val_by_weather/1
   name: intensity_val
   ext: .npy
   shuffle: False
@@ -96,4 +96,4 @@ image_fn:
   reflect: True
 base_save: 'eval'
 train_save: 'train'
-val_save: 'val0'
+val_save: 'val_1'

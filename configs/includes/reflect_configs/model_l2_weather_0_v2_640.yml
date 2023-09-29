@@ -96,4 +96,4 @@ image_fn:
   reflect: True
 base_save: 'eval'
 train_save: 'train'
-val_save: 'val0'
+val_save: 'val_0'

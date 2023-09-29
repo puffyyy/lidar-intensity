@@ -115,7 +115,6 @@ class WaymoDataset(tu.SimpleDataset):
         super().__init__(folder, name=name, ext=ext, shuffle=shuffle, keep_ram=keep_ram)
     
     def load_and_transform(self, fname, key):
-        print(fname)
         loaded_data = np.load(fname)
         result = dict()
         result['key'] = key
@@ -192,12 +191,43 @@ class EvalWaymoRunner(tu.Runner):
                 self.embedder[idx].load_state_dict(item)
         self.model.load_state_dict(cp['state_dict'])
 
+    def image_fn_waymo(self, source, pred, mask):
+        BORDER = 5
+        pred_value = pred
+        intensity = source
+        mask = mask > 0
+        pred_value[~mask] = 0
+        intensity[~mask] = 0
+        ok_map = np.abs(pred_value - intensity)
+        score = (ok_map[mask] ** 2).mean()
+        h, w, *_ = intensity.shape
+        result = np.ones((h * 3 + 2 * BORDER, w))
+        result[:h] = intensity
+        result[h + BORDER: 2 * h + BORDER] = pred_value
+        result[-h:] = ok_map
+        return (result * 255).astype('u1'), ok_map, score
+    
     def run_after_iter(self, batch, output, loss, mode, did, batch_id, _, dataset):
         # result, score = self.image_fn(batch, output, i)
         os.makedirs(self.store_dir, exist_ok=True)
-        *_, intensity = output
-        intensity = np.squeeze(intensity.cpu().numpy())
-        intensity = np.concatenate((intensity[3][:,332-1:2:-1],intensity[1],intensity[0],intensity[2],intensity[3][:,-4:-332-1:-1]),axis=-1)
+        *_, intensity_pred = output
+        # intensity_pred = np.squeeze(intensity_pred.cpu().numpy())
+        # intensity_pred = np.concatenate((intensity_pred[3][:,332-1:2:-1],intensity_pred[1],intensity_pred[0],intensity_pred[2],intensity_pred[3][:,-4:-332-1:-1]),axis=-1)
+        # raw_data = batch['raw']
+        # intensity_gt = raw_data[:,:,4]
+        # mask = raw_data[:,:,12]
+        # img, intensity_diff, score = self.image_fn_waymo(intensity_gt, intensity_pred, mask)
+        # raw_data[:,:,4] = intensity_diff
+        # diff_pc = raw_data[:,:,1:5]
+        # diff_pc[:,:,-1] = intensity_diff
+        # np.save(os.path.join(self.store_dir,f'diff_{osp.splitext(osp.basename(dataset.files[batch["key"][0]]))[0]}.npy'),diff_pc)
+        # np.save(os.path.join(self.store_dir,f'full_{osp.splitext(osp.basename(dataset.files[batch["key"][0]]))[0]}.npy'),raw_data)
+        # Image.fromarray(img).save(osp.join(self.store_dir,
+        #             f'{score:.4f}-{osp.splitext(osp.basename(dataset.files[batch["key"][0]]))[0]}.png'))
+
+        intensity = np.squeeze(intensity_pred.cpu().numpy())
+        intensity = np.concatenate((intensity[1][:,687:50:-1],intensity[0], intensity[1][:,-51:-688:-1]),axis=-1)
+        
         raw = batch['raw']
         raw[:,:,4] = intensity
         np.save(os.path.join(self.store_dir,f'{osp.splitext(osp.basename(dataset.files[batch["key"][0]]))[0]}.npy'),raw)
@@ -261,10 +291,13 @@ class EvalRunner(tu.Runner):
 
     def run_after_iter(self, batch, output, loss, mode, did, batch_id, _, dataset):
         for i in range(len(batch['key'])):
-            result, score = self.image_fn(batch, output, i)
+            result, (src_pc, pred_pc, diff_pc), score = self.image_fn(batch, output, i)
             os.makedirs(self.store_dir, exist_ok=True)
             Image.fromarray(result).save(osp.join(self.store_dir,
                                                   f'{score:.4f}-{osp.splitext(osp.basename(dataset.files[batch["key"][i]]))[0]}.png'))
+            np.save(os.path.join(self.store_dir,f'src-{osp.splitext(osp.basename(dataset.files[batch["key"][i]]))[0]}.npy'), src_pc)
+            np.save(os.path.join(self.store_dir,f'pred-{osp.splitext(osp.basename(dataset.files[batch["key"][i]]))[0]}.npy'), pred_pc)
+            np.save(os.path.join(self.store_dir,f'diff-{osp.splitext(osp.basename(dataset.files[batch["key"][i]]))[0]}.npy'), diff_pc)
         info = self.info_fn(batch, output)
         if self.info_accum[(dataset, mode)] is None:
             self.info_accum[(dataset, mode)] = info
@@ -351,7 +384,7 @@ class Runner(tu.Runner):
             for k, v in loss_dict.items():
                 self.writer.add_scalar(mode.name + str(k), v.detach().cpu().numpy(),self.batch_id[mode.name])
         if self.scheduler is not None:
-            self.writer.add_scalar(mode.name + str(k), self.scheduler.get_last_lr(),self.batch_id[mode.name])
+            self.writer.add_scalar(mode.name + 'lr', self.scheduler.get_last_lr(),self.batch_id[mode.name])
         self.batch_id[mode.name] += 1
     def run_after_epoch(self, dataset, mode):
         if mode is tu.TorchMode.TRAIN:

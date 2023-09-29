@@ -66,19 +66,19 @@ train:
   limits:
     - min: 0
       max: 64
-    - min: 960
-      max: 1600
+    - min: 993
+      max: 1657
 val:
   folder: /mnt/data/ADG_1/caixinyu/dataset/intensity/val_by_weather/0
-  name: intensity_val
+  name: intensity_carla_val
   ext: .npy
   shuffle: False
   keep_ram: True
   limits:
     - min: 0
       max: 64
-    - min: 960
-      max: 1600
+    - min: 993
+      max: 1657
 #512
 train_loader:
   batch_size: 24
@@ -86,14 +86,14 @@ train_loader:
   num_workers: 8
   pin_memory: True
 val_loader:
-  batch_size: 4
+  batch_size: 1
   shuffle: False
-  num_workers: 4
+  num_workers: 1
   pin_memory: True
 
-checkpoint: /home/admin/workspace/yangdonglin/workplace/lidar-intensity/runs/drgbl_l2_640_lr0.005bs48e200/
+checkpoint: /home/admin/workspace/yangdonglin/workplace/lidar-intensity/runs/drgbl_l2_664_lr0.01bs48e500
 image_fn:
   reflect: True
 base_save: 'eval'
 train_save: 'train'
-val_save: 'val0'
+val_save: 'val_0'
